@@ -1,17 +1,22 @@
 const { Client, GatewayIntentBits } = require("discord.js");
-const admin = require("firebase-admin");
-
-const serviceAccount = JSON.parse(process.env.FIREBASE);
-
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
-});
-
-const db = admin.firestore();
+const fs = require("fs");
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds]
 });
+
+const DATA_FILE = "./data.json";
+
+// 📥 lire data
+function getData() {
+  if (!fs.existsSync(DATA_FILE)) return {};
+  return JSON.parse(fs.readFileSync(DATA_FILE));
+}
+
+// 📤 sauver data
+function saveData(data) {
+  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+}
 
 client.on("ready", () => {
   console.log(`✅ Connecté en tant que ${client.user.tag}`);
@@ -21,34 +26,33 @@ client.on("interactionCreate", async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
   const guildId = interaction.guild.id;
+  const data = getData();
 
+  if (!data[guildId]) data[guildId] = 0;
+
+  // 🔼 BUMP
   if (interaction.commandName === "bump") {
-    const ref = db.collection("servers").doc(guildId);
-    const doc = await ref.get();
+    data[guildId] += 1;
+    saveData(data);
 
-    let bumps = doc.exists ? doc.data().bumps + 1 : 1;
-
-    await ref.set({ bumps });
-
-    interaction.reply(`✅ Bump ! Total : ${bumps}`);
+    return interaction.reply(`✅ Bump ! Total : ${data[guildId]}`);
   }
 
+  // 🏆 TOP (simple version)
   if (interaction.commandName === "top-bumps") {
-    const snapshot = await db
-      .collection("servers")
-      .orderBy("bumps", "desc")
-      .limit(30)
-      .get();
+    const sorted = Object.entries(data)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 30);
 
-    let msg = "🏆 Top 30 serveurs :\n\n";
+    let msg = "🏆 Top serveurs :\n\n";
 
     let i = 1;
-    snapshot.forEach(doc => {
-      msg += `${i}. ${doc.id} — ${doc.data().bumps}\n`;
+    for (const [id, bumps] of sorted) {
+      msg += `${i}. ${id} — ${bumps} bumps\n`;
       i++;
-    });
+    }
 
-    interaction.reply(msg);
+    return interaction.reply(msg);
   }
 });
 
