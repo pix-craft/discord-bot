@@ -2,58 +2,105 @@ const { Client, GatewayIntentBits } = require("discord.js");
 const fs = require("fs");
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds]
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages]
 });
 
 const DATA_FILE = "./data.json";
 
-// 📥 lire data
-function getData() {
-  if (!fs.existsSync(DATA_FILE)) return {};
+// ---------- DATA ----------
+function load() {
   return JSON.parse(fs.readFileSync(DATA_FILE));
 }
-
-// 📤 sauver data
-function saveData(data) {
+function save(data) {
   fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
 }
 
-client.on("ready", () => {
-  console.log(`✅ Connecté en tant que ${client.user.tag}`);
+// ---------- READY ----------
+client.once("ready", () => {
+  console.log(`✅ Bot connecté : ${client.user.tag}`);
 });
 
+// ---------- COMMANDES ----------
 client.on("interactionCreate", async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
+  const data = load();
   const guildId = interaction.guild.id;
-  const data = getData();
 
-  if (!data[guildId]) data[guildId] = 0;
+  if (!data.servers[guildId]) data.servers[guildId] = 0;
 
-  // 🔼 BUMP
+  // ======================
+  // 🔼 /bump
+  // ======================
   if (interaction.commandName === "bump") {
-    data[guildId] += 1;
-    saveData(data);
+    const now = Date.now();
+    const cd = data.cooldowns[guildId + interaction.user.id] || 0;
 
-    return interaction.reply(`✅ Bump ! Total : ${data[guildId]}`);
+    if (now < cd) {
+      const timeLeft = Math.ceil((cd - now) / 1000 / 60);
+      return interaction.reply(`⏳ Attends encore **${timeLeft} min** avant de rebump !`);
+    }
+
+    if (!data.invites[guildId]) {
+      return interaction.reply("❌ Tu dois configurer une invite avec `/bump-invite` !");
+    }
+
+    data.servers[guildId]++;
+
+    data.cooldowns[guildId + interaction.user.id] = now + 2 * 60 * 60 * 1000;
+
+    save(data);
+
+    return interaction.reply(`🚀 Serveur bumpé ! Total : **${data.servers[guildId]}**`);
   }
 
-  // 🏆 TOP (simple version)
-  if (interaction.commandName === "top-bumps") {
-    const sorted = Object.entries(data)
+  // ======================
+  // 🔗 /bump-invite
+  // ======================
+  if (interaction.commandName === "bump-invite") {
+    const invite = interaction.options.getString("url");
+
+    data.invites[guildId] = invite;
+
+    save(data);
+
+    return interaction.reply("🔗 Invite enregistrée pour le top-bump !");
+  }
+
+  // ======================
+  // 🏆 /top-bump
+  // ======================
+  if (interaction.commandName === "top-bump") {
+    const sorted = Object.entries(data.servers)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 30);
 
-    let msg = "🏆 Top serveurs :\n\n";
+    let msg = "🏆 **TOP 30 SERVEURS BUMPÉS** 🔥\n\n";
 
     let i = 1;
     for (const [id, bumps] of sorted) {
-      msg += `${i}. ${id} — ${bumps} bumps\n`;
+      const invite = data.invites[id] || "Aucune invite";
+      msg += `**${i}.** 🏷️ <@${id}> — 🚀 ${bumps} bumps → 🔗 ${invite}\n`;
       i++;
     }
 
     return interaction.reply(msg);
   }
+
+  // ======================
+  // ⏰ /rappel-bump
+  // ======================
+  if (interaction.commandName === "rappel-bump") {
+    const message = interaction.options.getString("message");
+    const mention = interaction.options.getString("mention");
+
+    data.reminders[guildId] = { message, mention };
+
+    save(data);
+
+    return interaction.reply(`🔔 Rappel configuré : ${message}`);
+  }
 });
 
+// ---------- LOGIN ----------
 client.login(process.env.TOKEN);
