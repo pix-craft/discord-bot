@@ -17,7 +17,7 @@ const client = new Client({
 
 const DATA_FILE = "./data.json";
 
-// ================= DATA =================
+// ================= DATA SAFE =================
 function load() {
   try {
     const data = JSON.parse(fs.readFileSync(DATA_FILE));
@@ -53,43 +53,51 @@ client.on("interactionCreate", async interaction => {
   const guildId = interaction.guild?.id;
   const userId = interaction.user.id;
 
+  if (!data.servers[guildId]) data.servers[guildId] = 0;
+
   // ================= /BUMP =================
   if (interaction.commandName === "bump") {
 
     if (!data.invites[guildId]) {
       return interaction.reply({
-        content: "❌ Configure d'abord une invite avec /bump-invite",
+        content: "❌ Configure une invite avec /bump-invite",
         ephemeral: true
       });
     }
 
     const now = Date.now();
-    const cooldownTime = 2 * 60 * 60 * 1000;
+    const cooldownTime = 2 * 60 * 60 * 1000; // 2h
+    const key = guildId; // 🔥 COOLDOWN PAR SERVEUR
 
-    if (data.cooldowns[userId]) {
-      const expire = data.cooldowns[userId] + cooldownTime;
+    if (data.cooldowns[key]) {
+      const expire = data.cooldowns[key] + cooldownTime;
 
       if (now < expire) {
-        const min = Math.ceil((expire - now) / 60000);
+        const msLeft = expire - now;
+
+        const minutes = Math.floor(msLeft / 60000);
+        const seconds = Math.floor((msLeft % 60000) / 1000);
 
         return interaction.reply({
-          content: `⏳ Attends ${min} minutes`,
+          content: `⏳ Ce serveur peut être bump dans **${minutes}m ${seconds}s**`,
           ephemeral: true
         });
       }
     }
 
-    data.cooldowns[userId] = now;
-    data.servers[guildId] = (data.servers[guildId] || 0) + 1;
+    // reset cooldown
+    data.cooldowns[key] = now;
+
+    data.servers[guildId]++;
     save(data);
 
     const embed = new EmbedBuilder()
       .setTitle("✅ Bump effectué")
       .setDescription(
-        `Merci <@${userId}> !\n\n` +
-        `🚀 Serveur : **${interaction.guild.name}**\n` +
-        `📊 Total bumps : **${data.servers[guildId]}**\n\n` +
-        `⏳ Reviens dans 2 heures`
+        `👤 Par : <@${userId}>\n` +
+        `🏠 Serveur : **${interaction.guild.name}**\n\n` +
+        `📊 Total bumps : **${data.servers[guildId]}**\n` +
+        `⏳ Prochain bump dans **2 heures**`
       )
       .setColor(0x00ff99);
 
@@ -107,7 +115,7 @@ client.on("interactionCreate", async interaction => {
     );
 
     return interaction.reply({
-      content: "🔗 Sélectionne un salon pour générer une invite illimitée :",
+      content: "🔗 Choisis un salon pour générer une invite illimitée :",
       components: [menu],
       ephemeral: true
     });
@@ -176,7 +184,7 @@ client.on("interactionCreate", async interaction => {
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setLabel("➕ Voir plus")
+        .setLabel("➕ Voir plus de serveurs")
         .setStyle(ButtonStyle.Link)
         .setURL("https://bp-discord.github.io/adminbot/bumps/top")
     );
@@ -193,6 +201,10 @@ client.on("interactionCreate", async interaction => {
 
     if (msg.toLowerCase().includes("bonjour")) {
       return interaction.reply("👋 Salut !");
+    }
+
+    if (msg.toLowerCase().includes("bump")) {
+      return interaction.reply("🚀 Un bump est possible toutes les 2 heures !");
     }
 
     return interaction.reply("🤖 IA en développement...");
