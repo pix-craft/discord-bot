@@ -12,12 +12,19 @@ const {
 const fs = require("fs");
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds]
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent // 🔥 IMPORTANT pour IA
+  ]
 });
 
+// ================= DATA =================
 const DATA_FILE = "./data.json";
 
-// ================= DATA SAFE =================
+// salons IA actifs
+const aiChannels = new Set();
+
 function load() {
   try {
     const data = JSON.parse(fs.readFileSync(DATA_FILE));
@@ -45,18 +52,15 @@ client.once("ready", () => {
   console.log(`✅ AdminBot connecté : ${client.user.tag}`);
 });
 
-// ================= INTERACTIONS =================
+// ================= COMMANDES =================
 client.on("interactionCreate", async interaction => {
-  if (!interaction.isChatInputCommand() && !interaction.isChannelSelectMenu()) return;
 
   const data = load();
   const guildId = interaction.guild?.id;
   const userId = interaction.user.id;
 
-  if (!data.servers[guildId]) data.servers[guildId] = 0;
-
   // ================= /BUMP =================
-  if (interaction.commandName === "bump") {
+  if (interaction.isChatInputCommand() && interaction.commandName === "bump") {
 
     if (!data.invites[guildId]) {
       return interaction.reply({
@@ -66,38 +70,34 @@ client.on("interactionCreate", async interaction => {
     }
 
     const now = Date.now();
-    const cooldownTime = 2 * 60 * 60 * 1000; // 2h
-    const key = guildId; // 🔥 COOLDOWN PAR SERVEUR
+    const cooldownTime = 2 * 60 * 60 * 1000;
+    const key = guildId;
 
     if (data.cooldowns[key]) {
       const expire = data.cooldowns[key] + cooldownTime;
 
       if (now < expire) {
         const msLeft = expire - now;
-
-        const minutes = Math.floor(msLeft / 60000);
-        const seconds = Math.floor((msLeft % 60000) / 1000);
+        const m = Math.floor(msLeft / 60000);
+        const s = Math.floor((msLeft % 60000) / 1000);
 
         return interaction.reply({
-          content: `⏳ Ce serveur peut être bump dans **${minutes}m ${seconds}s**`,
+          content: `⏳ Reviens dans **${m}m ${s}s**`,
           ephemeral: true
         });
       }
     }
 
-    // reset cooldown
     data.cooldowns[key] = now;
-
-    data.servers[guildId]++;
+    data.servers[guildId] = (data.servers[guildId] || 0) + 1;
     save(data);
 
     const embed = new EmbedBuilder()
       .setTitle("✅ Bump effectué")
       .setDescription(
-        `👤 Par : <@${userId}>\n` +
-        `🏠 Serveur : **${interaction.guild.name}**\n\n` +
-        `📊 Total bumps : **${data.servers[guildId]}**\n` +
-        `⏳ Prochain bump dans **2 heures**`
+        `👤 <@${userId}> a bump le serveur **${interaction.guild.name}**\n\n` +
+        `📊 Total : **${data.servers[guildId]} bumps**\n` +
+        `⏳ Prochain bump dans 2h`
       )
       .setColor(0x00ff99);
 
@@ -105,27 +105,43 @@ client.on("interactionCreate", async interaction => {
   }
 
   // ================= /BUMP-INVITE =================
-  if (interaction.commandName === "bump-invite") {
+  if (interaction.isChatInputCommand() && interaction.commandName === "bump-invite") {
 
     const menu = new ActionRowBuilder().addComponents(
       new ChannelSelectMenuBuilder()
         .setCustomId("select_bump_channel")
-        .setPlaceholder("📢 Choisis un salon pour l'invitation")
+        .setPlaceholder("📢 Choisis un salon")
         .setChannelTypes(ChannelType.GuildText)
     );
 
     return interaction.reply({
-      content: "🔗 Choisis un salon pour générer une invite illimitée :",
+      content: "🔗 Sélectionne un salon pour créer une invite illimitée",
       components: [menu],
       ephemeral: true
     });
   }
 
-  // ================= SELECT MENU =================
+  // ================= /IA =================
+  if (interaction.isChatInputCommand() && interaction.commandName === "ia") {
+
+    const menu = new ActionRowBuilder().addComponents(
+      new ChannelSelectMenuBuilder()
+        .setCustomId("ia_select_channel")
+        .setPlaceholder("🤖 Choisis un salon IA")
+        .setChannelTypes(ChannelType.GuildText)
+    );
+
+    return interaction.reply({
+      content: "🤖 Choisis un salon où l’IA doit répondre automatiquement",
+      components: [menu],
+      ephemeral: true
+    });
+  }
+
+  // ================= SELECT BUMP INVITE =================
   if (interaction.isChannelSelectMenu() && interaction.customId === "select_bump_channel") {
 
     const channel = interaction.channels.first();
-
     if (!channel) {
       return interaction.update({
         content: "❌ Salon invalide",
@@ -148,17 +164,34 @@ client.on("interactionCreate", async interaction => {
       });
 
     } catch (err) {
-      console.error(err);
-
       return interaction.update({
-        content: "❌ Impossible de créer l'invitation",
+        content: "❌ Impossible de créer l'invite",
         components: []
       });
     }
   }
 
+  // ================= SELECT IA CHANNEL =================
+  if (interaction.isChannelSelectMenu() && interaction.customId === "ia_select_channel") {
+
+    const channel = interaction.channels.first();
+    if (!channel) {
+      return interaction.update({
+        content: "❌ Salon invalide",
+        components: []
+      });
+    }
+
+    aiChannels.add(channel.id);
+
+    return interaction.update({
+      content: `🤖 IA activée dans <#${channel.id}>`,
+      components: []
+    });
+  }
+
   // ================= /TOP-BUMP =================
-  if (interaction.commandName === "top-bump") {
+  if (interaction.isChatInputCommand() && interaction.commandName === "top-bump") {
 
     const sorted = Object.entries(data.servers)
       .sort((a, b) => b[1] - a[1])
@@ -184,7 +217,7 @@ client.on("interactionCreate", async interaction => {
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setLabel("➕ Voir plus de serveurs")
+        .setLabel("➕ Voir plus")
         .setStyle(ButtonStyle.Link)
         .setURL("https://bp-discord.github.io/adminbot/bumps/top")
     );
@@ -194,21 +227,31 @@ client.on("interactionCreate", async interaction => {
       components: [row]
     });
   }
+});
 
-  // ================= /IA =================
-  if (interaction.commandName === "ia") {
-    const msg = interaction.options.getString("message");
+// ================= IA MESSAGE SYSTEM =================
+client.on("messageCreate", async message => {
 
-    if (msg.toLowerCase().includes("bonjour")) {
-      return interaction.reply("👋 Salut !");
-    }
+  if (message.author.bot) return;
+  if (!aiChannels.has(message.channel.id)) return;
 
-    if (msg.toLowerCase().includes("bump")) {
-      return interaction.reply("🚀 Un bump est possible toutes les 2 heures !");
-    }
+  const content = message.content.toLowerCase();
 
-    return interaction.reply("🤖 IA en développement...");
+  let response = "🤖 Je ne comprends pas.";
+
+  if (content.includes("bonjour")) {
+    response = "👋 Salut !";
   }
+
+  if (content.includes("bump")) {
+    response = "🚀 Pense à bump toutes les 2 heures !";
+  }
+
+  if (content.includes("quoi")) {
+    response = "feur 😏";
+  }
+
+  message.reply(response);
 });
 
 // ================= LOGIN =================
