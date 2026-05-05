@@ -178,11 +178,12 @@ client.on("interactionCreate", async interaction => {
       .setDescription(desc || "Aucun serveur");
 
     const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setLabel("<:PlusBouton:1501339112420933803> Voir plus")
-        .setStyle(ButtonStyle.Link)
-        .setURL("https://bp-discord.github.io/adminbot/bumps/top")
-    );
+  new ButtonBuilder()
+    .setLabel("Voir plus")
+    .setEmoji("1501339112420933803")
+    .setStyle(ButtonStyle.Link)
+    .setURL("https://bp-discord.github.io/adminbot/bumps/top")
+);
 
     return interaction.reply({ embeds: [embed], components: [row] });
   }
