@@ -95,7 +95,7 @@ client.on("interactionCreate", async interaction => {
             `Vous pourrez de nouveau bump dans **${timeText.trim()}**.\n\n` +
             `• ${interaction.guild.name}`
           )
-          .setImage("https://raw.githubusercontent.com/pix-craft/pix-craft.github.io/main/Screenshot_20260504_013618_Chrome.jpg");
+          .setImage("https://raw.githubusercontent.com/bp-discord/bp-discord.github.io/refs/heads/main/adminbot/ADMINBOT_20260505_190501_0000(1).png");
 
         return interaction.reply({ embeds: [embed] });
       }
