@@ -126,7 +126,7 @@ client.on("interactionCreate", async interaction => {
     const menu = new ActionRowBuilder().addComponents(
       new ChannelSelectMenuBuilder()
         .setCustomId("select_bump_channel")
-        .setPlaceholder("🔗 Salon d'invitation")
+        .setPlaceholder("<:Plus:1501336256645173281> Sélectionne un salon d'invitation")
         .setChannelTypes(ChannelType.GuildText)
     );
 
@@ -143,7 +143,7 @@ client.on("interactionCreate", async interaction => {
     const menu = new ActionRowBuilder().addComponents(
       new ChannelSelectMenuBuilder()
         .setCustomId("ia_select_channel")
-        .setPlaceholder("<:Plus:1501336256645173281> Salon d'IA")
+        .setPlaceholder("🤖 Salon d'IA")
         .setChannelTypes(ChannelType.GuildText)
     );
 
@@ -179,7 +179,7 @@ client.on("interactionCreate", async interaction => {
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setLabel("<:PlusBouton:1501339112420933803> Voir plus")
+        .setLabel("➕ Voir plus")
         .setStyle(ButtonStyle.Link)
         .setURL("https://bp-discord.github.io/adminbot/bumps/top")
     );
@@ -202,7 +202,7 @@ client.on("interactionCreate", async interaction => {
     save(data);
 
     return interaction.update({
-      content: `🔗 Invite créée depuis <#${channel.id}>`,
+      content: `<:Plus:1501336256645173281> Invite créée depuis <#${channel.id}>`,
       components: []
     });
   }
