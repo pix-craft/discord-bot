@@ -15,15 +15,24 @@ const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent // 🔥 IMPORTANT pour IA
+    GatewayIntentBits.MessageContent
   ]
 });
 
 // ================= DATA =================
 const DATA_FILE = "./data.json";
 
-// salons IA actifs
 const aiChannels = new Set();
+
+// mémoire IA par salon
+const aiMemory = new Map();
+
+function getMemory(channelId) {
+  if (!aiMemory.has(channelId)) {
+    aiMemory.set(channelId, []);
+  }
+  return aiMemory.get(channelId);
+}
 
 function load() {
   try {
@@ -52,7 +61,7 @@ client.once("ready", () => {
   console.log(`✅ AdminBot connecté : ${client.user.tag}`);
 });
 
-// ================= COMMANDES =================
+// ================= INTERACTIONS =================
 client.on("interactionCreate", async interaction => {
 
   const data = load();
@@ -95,9 +104,8 @@ client.on("interactionCreate", async interaction => {
     const embed = new EmbedBuilder()
       .setTitle("✅ Bump effectué")
       .setDescription(
-        `👤 <@${userId}> a bump le serveur **${interaction.guild.name}**\n\n` +
-        `📊 Total : **${data.servers[guildId]} bumps**\n` +
-        `⏳ Prochain bump dans 2h`
+        `👤 <@${userId}> a bump **${interaction.guild.name}**\n` +
+        `📊 Total : **${data.servers[guildId]} bumps**`
       )
       .setColor(0x00ff99);
 
@@ -115,7 +123,7 @@ client.on("interactionCreate", async interaction => {
     );
 
     return interaction.reply({
-      content: "🔗 Sélectionne un salon pour créer une invite illimitée",
+      content: "🔗 Sélectionne un salon pour créer une invite",
       components: [menu],
       ephemeral: true
     });
@@ -132,65 +140,13 @@ client.on("interactionCreate", async interaction => {
     );
 
     return interaction.reply({
-      content: "🤖 Choisis un salon où l’IA doit répondre automatiquement",
+      content: "🤖 Active l’IA dans un salon",
       components: [menu],
       ephemeral: true
     });
   }
 
-  // ================= SELECT BUMP INVITE =================
-  if (interaction.isChannelSelectMenu() && interaction.customId === "select_bump_channel") {
-
-    const channel = interaction.channels.first();
-    if (!channel) {
-      return interaction.update({
-        content: "❌ Salon invalide",
-        components: []
-      });
-    }
-
-    try {
-      const invite = await channel.createInvite({
-        maxAge: 0,
-        maxUses: 0
-      });
-
-      data.invites[guildId] = invite.url;
-      save(data);
-
-      return interaction.update({
-        content: `🔗 Invite créée depuis <#${channel.id}>`,
-        components: []
-      });
-
-    } catch (err) {
-      return interaction.update({
-        content: "❌ Impossible de créer l'invite",
-        components: []
-      });
-    }
-  }
-
-  // ================= SELECT IA CHANNEL =================
-  if (interaction.isChannelSelectMenu() && interaction.customId === "ia_select_channel") {
-
-    const channel = interaction.channels.first();
-    if (!channel) {
-      return interaction.update({
-        content: "❌ Salon invalide",
-        components: []
-      });
-    }
-
-    aiChannels.add(channel.id);
-
-    return interaction.update({
-      content: `🤖 IA activée dans <#${channel.id}>`,
-      components: []
-    });
-  }
-
-  // ================= /TOP-BUMP =================
+  // ================= TOP BUMP =================
   if (interaction.isChatInputCommand() && interaction.commandName === "top-bump") {
 
     const sorted = Object.entries(data.servers)
@@ -227,31 +183,107 @@ client.on("interactionCreate", async interaction => {
       components: [row]
     });
   }
+
+  // ================= SELECT INVITE =================
+  if (interaction.isChannelSelectMenu() && interaction.customId === "select_bump_channel") {
+
+    const channel = interaction.channels.first();
+    if (!channel) return interaction.update({ content: "❌ Salon invalide", components: [] });
+
+    try {
+      const invite = await channel.createInvite({
+        maxAge: 0,
+        maxUses: 0
+      });
+
+      data.invites[guildId] = invite.url;
+      save(data);
+
+      return interaction.update({
+        content: `🔗 Invite créée : <#${channel.id}>`,
+        components: []
+      });
+
+    } catch {
+      return interaction.update({
+        content: "❌ Erreur création invite",
+        components: []
+      });
+    }
+  }
+
+  // ================= SELECT IA =================
+  if (interaction.isChannelSelectMenu() && interaction.customId === "ia_select_channel") {
+
+    const channel = interaction.channels.first();
+    if (!channel) return interaction.update({ content: "❌ Salon invalide", components: [] });
+
+    aiChannels.add(channel.id);
+
+    return interaction.update({
+      content: `🤖 IA activée dans <#${channel.id}>`,
+      components: []
+    });
+  }
 });
 
-// ================= IA MESSAGE SYSTEM =================
+// ================= IA INTELLIGENTE =================
 client.on("messageCreate", async message => {
 
   if (message.author.bot) return;
   if (!aiChannels.has(message.channel.id)) return;
 
-  const content = message.content.toLowerCase();
+  const memory = getMemory(message.channel.id);
 
-  let response = "🤖 Je ne comprends pas.";
+  memory.push({
+    user: message.author.id,
+    name: message.author.username,
+    content: message.content
+  });
 
-  if (content.includes("bonjour")) {
-    response = "👋 Salut !";
+  if (memory.length > 15) memory.shift();
+
+  const text = message.content.toLowerCase();
+
+  let response = "";
+
+  // ================= INTELLIGENCE =================
+
+  if (text.includes("bonjour")) {
+    response = `👋 Salut <@${message.author.id}> !`;
   }
 
-  if (content.includes("bump")) {
-    response = "🚀 Pense à bump toutes les 2 heures !";
+  else if (text.includes("c'est quoi") || text.includes("c est quoi")) {
+    response = "🤖 Donne-moi plus de détails et je t’explique.";
   }
 
-  if (content.includes("quoi")) {
+  else if (text.includes("code")) {
+    response = "💻 Dis-moi ce que tu veux coder.";
+  }
+
+  else if (text.includes("image") || text.includes("photo")) {
+    response = "🖼️ Je peux pas analyser les images pour l’instant, mais je peux les décrire si on ajoute une IA vision.";
+  }
+
+  else if (text.includes("il a dit") || text.includes("elle a dit")) {
+    const last = memory[memory.length - 2];
+    response = last
+      ? `🧠 ${last.name} a dit : "${last.content}"`
+      : "🤖 Pas assez de contexte.";
+  }
+
+  else if (text.includes("quoi")) {
     response = "feur 😏";
   }
 
-  message.reply(response);
+  else {
+    response = `🤖 Je réfléchis... peux-tu reformuler ?`;
+  }
+
+  message.reply({
+    content: response,
+    allowedMentions: { repliedUser: false }
+  });
 });
 
 // ================= LOGIN =================
