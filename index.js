@@ -23,26 +23,16 @@ const client = new Client({
 const DATA_FILE = "./data.json";
 
 const aiChannels = new Set();
-
-// mémoire IA par salon
 const aiMemory = new Map();
 
 function getMemory(channelId) {
-  if (!aiMemory.has(channelId)) {
-    aiMemory.set(channelId, []);
-  }
+  if (!aiMemory.has(channelId)) aiMemory.set(channelId, []);
   return aiMemory.get(channelId);
 }
 
 function load() {
   try {
-    const data = JSON.parse(fs.readFileSync(DATA_FILE));
-
-    if (!data.servers) data.servers = {};
-    if (!data.invites) data.invites = {};
-    if (!data.cooldowns) data.cooldowns = {};
-
-    return data;
+    return JSON.parse(fs.readFileSync(DATA_FILE));
   } catch {
     return {
       servers: {},
@@ -79,35 +69,53 @@ client.on("interactionCreate", async interaction => {
     }
 
     const now = Date.now();
-    const cooldownTime = 2 * 60 * 60 * 1000;
-    const key = guildId;
+    const cooldown = 2 * 60 * 60 * 1000;
 
-    if (data.cooldowns[key]) {
-      const expire = data.cooldowns[key] + cooldownTime;
+    let timeText = "2 heures";
+
+    if (data.cooldowns[guildId]) {
+      const expire = data.cooldowns[guildId] + cooldown;
 
       if (now < expire) {
-        const msLeft = expire - now;
-        const m = Math.floor(msLeft / 60000);
-        const s = Math.floor((msLeft % 60000) / 1000);
+        const remaining = expire - now;
 
-        return interaction.reply({
-          content: `⏳ Reviens dans **${m}m ${s}s**`,
-          ephemeral: true
-        });
+        const h = Math.floor(remaining / 3600000);
+        const m = Math.floor((remaining % 3600000) / 60000);
+
+        timeText = "";
+        if (h > 0) timeText += `${h} heure${h > 1 ? "s" : ""} `;
+        if (m > 0) timeText += `${m} minute${m > 1 ? "s" : ""}`;
+
+        const embed = new EmbedBuilder()
+          .setColor(0x2ecc71)
+          .setTitle("✅ Bump effectué")
+          .setThumbnail(interaction.user.displayAvatarURL({ dynamic: true }))
+          .setDescription(
+            `Merci à <@${userId}> d'avoir bumpé ce serveur.\n\n` +
+            `Vous pourrez de nouveau bump dans **${timeText.trim()}**.\n\n` +
+            `• ${interaction.guild.name}`
+          )
+          .setImage("https://raw.githubusercontent.com/pix-craft/pix-craft.github.io/main/Screenshot_20260504_013618_Chrome.jpg");
+
+        return interaction.reply({ embeds: [embed] });
       }
     }
 
-    data.cooldowns[key] = now;
+    // ================= NEW BUMP =================
+    data.cooldowns[guildId] = now;
     data.servers[guildId] = (data.servers[guildId] || 0) + 1;
     save(data);
 
     const embed = new EmbedBuilder()
+      .setColor(0x2ecc71)
       .setTitle("✅ Bump effectué")
+      .setThumbnail(interaction.user.displayAvatarURL({ dynamic: true }))
       .setDescription(
-        `👤 <@${userId}> a bump **${interaction.guild.name}**\n` +
-        `📊 Total : **${data.servers[guildId]} bumps**`
+        `Merci à <@${userId}> d'avoir bumpé ce serveur.\n\n` +
+        `Vous pourrez de nouveau bump dans **2 heures**.\n\n` +
+        `• ${interaction.guild.name}`
       )
-      .setColor(0x00ff99);
+      .setImage("https://raw.githubusercontent.com/pix-craft/pix-craft.github.io/main/Screenshot_20260504_013618_Chrome.jpg");
 
     return interaction.reply({ embeds: [embed] });
   }
@@ -123,7 +131,7 @@ client.on("interactionCreate", async interaction => {
     );
 
     return interaction.reply({
-      content: "🔗 Sélectionne un salon pour créer une invite",
+      content: "🔗 Choisis un salon pour créer une invite",
       components: [menu],
       ephemeral: true
     });
@@ -135,7 +143,7 @@ client.on("interactionCreate", async interaction => {
     const menu = new ActionRowBuilder().addComponents(
       new ChannelSelectMenuBuilder()
         .setCustomId("ia_select_channel")
-        .setPlaceholder("🤖 Choisis un salon IA")
+        .setPlaceholder("🤖 Salon IA")
         .setChannelTypes(ChannelType.GuildText)
     );
 
@@ -159,17 +167,15 @@ client.on("interactionCreate", async interaction => {
       const name = client.guilds.cache.get(id)?.name || "Serveur inconnu";
       const invite = data.invites[id];
 
-      if (invite) {
-        desc += `**${i + 1} • [${name}](${invite})** — **${bumps} bumps**\n`;
-      } else {
-        desc += `**${i + 1} • ${name}** — **${bumps} bumps**\n`;
-      }
+      desc += invite
+        ? `**${i + 1} • [${name}](${invite})** — **${bumps} bumps**\n`
+        : `**${i + 1} • ${name}** — **${bumps} bumps**\n`;
     });
 
     const embed = new EmbedBuilder()
-      .setTitle("🏆 Top serveurs")
-      .setDescription(desc || "Aucun serveur")
-      .setColor(0xffcc00);
+      .setTitle("🏆 Top Bumps")
+      .setColor(0xffcc00)
+      .setDescription(desc || "Aucun serveur");
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
@@ -178,38 +184,27 @@ client.on("interactionCreate", async interaction => {
         .setURL("https://bp-discord.github.io/adminbot/bumps/top")
     );
 
-    return interaction.reply({
-      embeds: [embed],
-      components: [row]
-    });
+    return interaction.reply({ embeds: [embed], components: [row] });
   }
 
-  // ================= SELECT INVITE =================
+  // ================= SELECT BUMP INVITE =================
   if (interaction.isChannelSelectMenu() && interaction.customId === "select_bump_channel") {
 
     const channel = interaction.channels.first();
     if (!channel) return interaction.update({ content: "❌ Salon invalide", components: [] });
 
-    try {
-      const invite = await channel.createInvite({
-        maxAge: 0,
-        maxUses: 0
-      });
+    const invite = await channel.createInvite({
+      maxAge: 0,
+      maxUses: 0
+    });
 
-      data.invites[guildId] = invite.url;
-      save(data);
+    data.invites[guildId] = invite.url;
+    save(data);
 
-      return interaction.update({
-        content: `🔗 Invite créée : <#${channel.id}>`,
-        components: []
-      });
-
-    } catch {
-      return interaction.update({
-        content: "❌ Erreur création invite",
-        components: []
-      });
-    }
+    return interaction.update({
+      content: `🔗 Invite créée depuis <#${channel.id}>`,
+      components: []
+    });
   }
 
   // ================= SELECT IA =================
@@ -227,7 +222,7 @@ client.on("interactionCreate", async interaction => {
   }
 });
 
-// ================= IA INTELLIGENTE =================
+// ================= IA =================
 client.on("messageCreate", async message => {
 
   if (message.author.bot) return;
@@ -245,45 +240,32 @@ client.on("messageCreate", async message => {
 
   const text = message.content.toLowerCase();
 
-  let response = "";
-
-  // ================= INTELLIGENCE =================
+  let response = "🤖 Je ne comprends pas.";
 
   if (text.includes("bonjour")) {
-    response = `👋 Salut <@${message.author.id}> !`;
+    response = `👋 Salut <@${message.author.id}>`;
   }
 
-  else if (text.includes("c'est quoi") || text.includes("c est quoi")) {
-    response = "🤖 Donne-moi plus de détails et je t’explique.";
+  else if (text.includes("c'est quoi")) {
+    response = "🤖 Explique-moi mieux et je t’aide.";
   }
 
   else if (text.includes("code")) {
     response = "💻 Dis-moi ce que tu veux coder.";
   }
 
-  else if (text.includes("image") || text.includes("photo")) {
-    response = "🖼️ Je peux pas analyser les images pour l’instant, mais je peux les décrire si on ajoute une IA vision.";
+  else if (text.includes("quoi")) {
+    response = "feur 😏";
   }
 
-  else if (text.includes("il a dit") || text.includes("elle a dit")) {
+  else if (text.includes("il a dit")) {
     const last = memory[memory.length - 2];
     response = last
       ? `🧠 ${last.name} a dit : "${last.content}"`
       : "🤖 Pas assez de contexte.";
   }
 
-  else if (text.includes("quoi")) {
-    response = "feur 😏";
-  }
-
-  else {
-    response = `🤖 Je réfléchis... peux-tu reformuler ?`;
-  }
-
-  message.reply({
-    content: response,
-    allowedMentions: { repliedUser: false }
-  });
+  message.reply({ content: response });
 });
 
 // ================= LOGIN =================
