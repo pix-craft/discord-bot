@@ -143,7 +143,7 @@ client.on("interactionCreate", async interaction => {
     const menu = new ActionRowBuilder().addComponents(
       new ChannelSelectMenuBuilder()
         .setCustomId("ia_select_channel")
-        .setPlaceholder("👾 Salon d'IA")
+        .setPlaceholder("<:Plus:1501336256645173281> Salon d'IA")
         .setChannelTypes(ChannelType.GuildText)
     );
 
@@ -179,7 +179,7 @@ client.on("interactionCreate", async interaction => {
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setLabel("➕ Voir plus")
+        .setLabel("<:PlusBouton:1501339112420933803> Voir plus")
         .setStyle(ButtonStyle.Link)
         .setURL("https://bp-discord.github.io/adminbot/bumps/top")
     );
@@ -216,7 +216,7 @@ client.on("interactionCreate", async interaction => {
     aiChannels.add(channel.id);
 
     return interaction.update({
-      content: `🤖 IA activée dans <#${channel.id}>`,
+      content: `<:Plus:1501336256645173281> IA activée dans <#${channel.id}>`,
       components: []
     });
   }
