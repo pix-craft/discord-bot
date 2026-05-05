@@ -126,12 +126,13 @@ client.on("interactionCreate", async interaction => {
     const menu = new ActionRowBuilder().addComponents(
       new ChannelSelectMenuBuilder()
         .setCustomId("select_bump_channel")
-        .setPlaceholder("<:Plus:1501336256645173281> Sélectionne un salon d'invitation")
+        .setPlaceholder("Salon d'invitation")
         .setChannelTypes(ChannelType.GuildText)
     );
 
     return interaction.reply({
-      content: "🔗 Salon d'invitation",
+      content: "# <:Plus:1501336256645173281>
+Sélectionne un salon d'invitation",
       components: [menu],
       ephemeral: true
     });
@@ -202,7 +203,8 @@ client.on("interactionCreate", async interaction => {
     save(data);
 
     return interaction.update({
-      content: `<:Plus:1501336256645173281> Invite créée depuis <#${channel.id}>`,
+      content: `# <:Plus:1501336256645173281>
+Invite créée depuis <#${channel.id}>`,
       components: []
     });
   }
