@@ -8,46 +8,18 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName("top-bump")
-    .setDescription("Afficher le top 30"),
+    .setDescription("Affiche le top des serveurs"),
 
   new SlashCommandBuilder()
     .setName("bump-invite")
-    .setDescription("Configurer l'invite")
-    .addStringOption(opt =>
-      opt.setName("url")
-        .setDescription("Lien Discord")
-        .setRequired(true)
-    ),
-
-  new SlashCommandBuilder()
-    .setName("rappel-bump")
-    .setDescription("Créer un rappel")
-    .addStringOption(opt =>
-      opt.setName("message")
-        .setDescription("Message")
-        .setRequired(true)
-    )
-    .addStringOption(opt =>
-      opt.setName("mention")
-        .setDescription("@everyone / @here")
-        .setRequired(true)
-    ),
+    .setDescription("Configurer l'invite du serveur"),
 
   new SlashCommandBuilder()
     .setName("ia")
     .setDescription("Parler avec AdminBot")
     .addStringOption(opt =>
-      opt.setName("mode")
-        .setDescription("Chat ou Vocal")
-        .setRequired(true)
-        .addChoices(
-          { name: "Chat", value: "chat" },
-          { name: "Vocal", value: "vocal" }
-        )
-    )
-    .addStringOption(opt =>
       opt.setName("message")
-        .setDescription("Message")
+        .setDescription("Ton message")
         .setRequired(true)
     )
 
@@ -66,6 +38,6 @@ const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
 
     console.log("✅ Commandes déployées !");
   } catch (err) {
-    console.error(err);
+    console.error("❌ Erreur deploy :", err);
   }
 })();
