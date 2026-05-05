@@ -4,7 +4,9 @@ const {
   EmbedBuilder,
   ActionRowBuilder,
   ButtonBuilder,
-  ButtonStyle
+  ButtonStyle,
+  ChannelSelectMenuBuilder,
+  ChannelType
 } = require("discord.js");
 
 const fs = require("fs");
@@ -15,7 +17,7 @@ const client = new Client({
 
 const DATA_FILE = "./data.json";
 
-// ================= DATA SAFE =================
+// ================= DATA =================
 function load() {
   try {
     const data = JSON.parse(fs.readFileSync(DATA_FILE));
@@ -45,50 +47,49 @@ client.once("ready", () => {
 
 // ================= INTERACTIONS =================
 client.on("interactionCreate", async interaction => {
-  if (!interaction.isChatInputCommand()) return;
+  if (!interaction.isChatInputCommand() && !interaction.isChannelSelectMenu()) return;
 
   const data = load();
-  const guildId = interaction.guild.id;
+  const guildId = interaction.guild?.id;
   const userId = interaction.user.id;
-
-  if (!data.servers[guildId]) data.servers[guildId] = 0;
-
-  const now = Date.now();
-  const cooldownTime = 2 * 60 * 60 * 1000;
 
   // ================= /BUMP =================
   if (interaction.commandName === "bump") {
 
     if (!data.invites[guildId]) {
       return interaction.reply({
-        content: "❌ Tu dois d'abord configurer une invite avec /bump-invite",
+        content: "❌ Configure d'abord une invite avec /bump-invite",
         ephemeral: true
       });
     }
 
-    if (data.cooldowns[userId]) {
-      const expiration = data.cooldowns[userId] + cooldownTime;
+    const now = Date.now();
+    const cooldownTime = 2 * 60 * 60 * 1000;
 
-      if (now < expiration) {
-        const remaining = Math.ceil((expiration - now) / 60000);
+    if (data.cooldowns[userId]) {
+      const expire = data.cooldowns[userId] + cooldownTime;
+
+      if (now < expire) {
+        const min = Math.ceil((expire - now) / 60000);
 
         return interaction.reply({
-          content: `⏳ Tu peux rebump dans ${remaining} minutes`,
+          content: `⏳ Attends ${min} minutes`,
           ephemeral: true
         });
       }
     }
 
     data.cooldowns[userId] = now;
-    data.servers[guildId]++;
+    data.servers[guildId] = (data.servers[guildId] || 0) + 1;
     save(data);
 
     const embed = new EmbedBuilder()
       .setTitle("✅ Bump effectué")
       .setDescription(
-        `Merci à <@${userId}> d'avoir bumpé le serveur **${interaction.guild.name}**.\n\n` +
-        `⏳ Tu pourras bump à nouveau dans **2 heures**.\n\n` +
-        `🚀 Ce serveur a maintenant **${data.servers[guildId]} bumps**.`
+        `Merci <@${userId}> !\n\n` +
+        `🚀 Serveur : **${interaction.guild.name}**\n` +
+        `📊 Total bumps : **${data.servers[guildId]}**\n\n` +
+        `⏳ Reviens dans 2 heures`
       )
       .setColor(0x00ff99);
 
@@ -97,12 +98,30 @@ client.on("interactionCreate", async interaction => {
 
   // ================= /BUMP-INVITE =================
   if (interaction.commandName === "bump-invite") {
-    const channel = interaction.options.getChannel("salon");
 
-    if (!channel || !channel.isTextBased()) {
-      return interaction.reply({
+    const menu = new ActionRowBuilder().addComponents(
+      new ChannelSelectMenuBuilder()
+        .setCustomId("select_bump_channel")
+        .setPlaceholder("📢 Choisis un salon pour l'invitation")
+        .setChannelTypes(ChannelType.GuildText)
+    );
+
+    return interaction.reply({
+      content: "🔗 Sélectionne un salon pour générer une invite illimitée :",
+      components: [menu],
+      ephemeral: true
+    });
+  }
+
+  // ================= SELECT MENU =================
+  if (interaction.isChannelSelectMenu() && interaction.customId === "select_bump_channel") {
+
+    const channel = interaction.channels.first();
+
+    if (!channel) {
+      return interaction.update({
         content: "❌ Salon invalide",
-        ephemeral: true
+        components: []
       });
     }
 
@@ -115,43 +134,49 @@ client.on("interactionCreate", async interaction => {
       data.invites[guildId] = invite.url;
       save(data);
 
-      return interaction.reply("🔗 Invite illimitée créée !");
-    } catch {
-      return interaction.reply({
+      return interaction.update({
+        content: `🔗 Invite créée depuis <#${channel.id}>`,
+        components: []
+      });
+
+    } catch (err) {
+      console.error(err);
+
+      return interaction.update({
         content: "❌ Impossible de créer l'invitation",
-        ephemeral: true
+        components: []
       });
     }
   }
 
   // ================= /TOP-BUMP =================
   if (interaction.commandName === "top-bump") {
+
     const sorted = Object.entries(data.servers)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 30);
 
-    let description = "";
+    let desc = "";
 
     sorted.forEach(([id, bumps], i) => {
-      const position = i + 1;
-      const guildName = client.guilds.cache.get(id)?.name || "Serveur inconnu";
+      const name = client.guilds.cache.get(id)?.name || "Serveur inconnu";
       const invite = data.invites[id];
 
       if (invite) {
-        description += `**${position} • [${guildName}](${invite})** — **${bumps} bumps**\n`;
+        desc += `**${i + 1} • [${name}](${invite})** — **${bumps} bumps**\n`;
       } else {
-        description += `**${position} • ${guildName}** — **${bumps} bumps**\n`;
+        desc += `**${i + 1} • ${name}** — **${bumps} bumps**\n`;
       }
     });
 
     const embed = new EmbedBuilder()
-      .setTitle("🏆 Top des serveurs")
-      .setDescription(description || "Aucun serveur")
+      .setTitle("🏆 Top serveurs")
+      .setDescription(desc || "Aucun serveur")
       .setColor(0xffcc00);
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setLabel("➕ Voir plus de serveurs")
+        .setLabel("➕ Voir plus")
         .setStyle(ButtonStyle.Link)
         .setURL("https://bp-discord.github.io/adminbot/bumps/top")
     );
@@ -168,10 +193,6 @@ client.on("interactionCreate", async interaction => {
 
     if (msg.toLowerCase().includes("bonjour")) {
       return interaction.reply("👋 Salut !");
-    }
-
-    if (msg.toLowerCase().includes("bump")) {
-      return interaction.reply("🚀 Tu peux bump toutes les 2 heures !");
     }
 
     return interaction.reply("🤖 IA en développement...");
