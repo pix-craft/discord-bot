@@ -71,8 +71,7 @@ client.on("interactionCreate", async interaction => {
     const now = Date.now();
     const cooldown = 2 * 60 * 60 * 1000;
 
-    let timeText = "2 heures";
-
+    // ================= COOLDOWN =================
     if (data.cooldowns[guildId]) {
       const expire = data.cooldowns[guildId] + cooldown;
 
@@ -82,22 +81,22 @@ client.on("interactionCreate", async interaction => {
         const h = Math.floor(remaining / 3600000);
         const m = Math.floor((remaining % 3600000) / 60000);
 
-        timeText = "";
+        let timeText = "";
         if (h > 0) timeText += `${h} heure${h > 1 ? "s" : ""} `;
         if (m > 0) timeText += `${m} minute${m > 1 ? "s" : ""}`;
 
         const embed = new EmbedBuilder()
-          .setColor(0x2ecc71)
-          .setTitle("❌ Serveur déja bump")
+          .setColor(0xff9900)
+          .setTitle("⏳ Bump indisponible")
           .setThumbnail(interaction.user.displayAvatarURL({ dynamic: true }))
           .setDescription(
-            `<@${userId}>, ce serveur à déja reçu un bump.\n\n` +
-            `Vous pourrez de nouveau bump dans **${timeText.trim()}**.\n\n` +
+            `Tu dois attendre avant de pouvoir rebump.\n\n` +
+            `⏱️ Temps restant : **${timeText.trim()}**\n\n` +
             `• ${interaction.guild.name}`
           )
           .setImage("https://raw.githubusercontent.com/bp-discord/bp-discord.github.io/refs/heads/main/adminbot/ADMINBOT_20260505_190501_0000(1).png");
 
-        return interaction.reply({ embeds: [embed] });
+        return interaction.reply({ embeds: [embed], ephemeral: true });
       }
     }
 
@@ -112,7 +111,8 @@ client.on("interactionCreate", async interaction => {
       .setThumbnail(interaction.user.displayAvatarURL({ dynamic: true }))
       .setDescription(
         `Merci à <@${userId}> d'avoir bumpé ce serveur.\n\n` +
-        `Vous pourrez de nouveau bump dans **2 heures**.\n\n` +
+        `📊 Total : **${data.servers[guildId]} bumps**\n` +
+        `⏳ Prochain bump dans **2 heures**\n\n` +
         `• ${interaction.guild.name}`
       )
       .setImage("https://raw.githubusercontent.com/bp-discord/bp-discord.github.io/refs/heads/main/adminbot/ADMINBOT_20260505_190501_0000(1).png");
@@ -126,13 +126,12 @@ client.on("interactionCreate", async interaction => {
     const menu = new ActionRowBuilder().addComponents(
       new ChannelSelectMenuBuilder()
         .setCustomId("select_bump_channel")
-        .setPlaceholder("Salon d'invitation")
+        .setPlaceholder("📢 Choisis un salon")
         .setChannelTypes(ChannelType.GuildText)
     );
 
     return interaction.reply({
-      content: "# <:Plus:1501336256645173281>
-Sélectionne un salon d'invitation",
+      content: "🔗 Choisis un salon pour créer une invite",
       components: [menu],
       ephemeral: true
     });
@@ -144,18 +143,18 @@ Sélectionne un salon d'invitation",
     const menu = new ActionRowBuilder().addComponents(
       new ChannelSelectMenuBuilder()
         .setCustomId("ia_select_channel")
-        .setPlaceholder("🤖 Salon d'IA")
+        .setPlaceholder("🤖 Salon IA")
         .setChannelTypes(ChannelType.GuildText)
     );
 
     return interaction.reply({
-      content: "Active l'IA dans un salon",
+      content: "🤖 Active l’IA dans un salon",
       components: [menu],
       ephemeral: true
     });
   }
 
-  // ================= TOP BUMP =================
+  // ================= /TOP-BUMP =================
   if (interaction.isChatInputCommand() && interaction.commandName === "top-bump") {
 
     const sorted = Object.entries(data.servers)
@@ -180,7 +179,7 @@ Sélectionne un salon d'invitation",
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setLabel("➕ Voir plus")
+        .setLabel("<:PlusBouton:1501339112420933803> Voir plus")
         .setStyle(ButtonStyle.Link)
         .setURL("https://bp-discord.github.io/adminbot/bumps/top")
     );
@@ -188,7 +187,7 @@ Sélectionne un salon d'invitation",
     return interaction.reply({ embeds: [embed], components: [row] });
   }
 
-  // ================= SELECT BUMP INVITE =================
+  // ================= SELECT INVITE =================
   if (interaction.isChannelSelectMenu() && interaction.customId === "select_bump_channel") {
 
     const channel = interaction.channels.first();
@@ -203,8 +202,7 @@ Sélectionne un salon d'invitation",
     save(data);
 
     return interaction.update({
-      content: `# <:Plus:1501336256645173281>
-Invite créée depuis <#${channel.id}>`,
+      content: `🔗 Invite créée depuis <#${channel.id}>`,
       components: []
     });
   }
@@ -218,7 +216,7 @@ Invite créée depuis <#${channel.id}>`,
     aiChannels.add(channel.id);
 
     return interaction.update({
-      content: `<:Plus:1501336256645173281> IA activée dans <#${channel.id}>`,
+      content: `🤖 IA activée dans <#${channel.id}>`,
       components: []
     });
   }
@@ -249,7 +247,7 @@ client.on("messageCreate", async message => {
   }
 
   else if (text.includes("c'est quoi")) {
-    response = "🤖 Explique-moi mieux et je t’aide.";
+    response = "🤖 Explique-moi mieux.";
   }
 
   else if (text.includes("code")) {
