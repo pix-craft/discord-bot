@@ -88,10 +88,10 @@ client.on("interactionCreate", async interaction => {
 
         const embed = new EmbedBuilder()
           .setColor(0x2ecc71)
-          .setTitle("✅ Bump effectué")
+          .setTitle("❌ Serveur déja bump")
           .setThumbnail(interaction.user.displayAvatarURL({ dynamic: true }))
           .setDescription(
-            `Merci à <@${userId}> d'avoir bumpé ce serveur.\n\n` +
+            `<@${userId}>, ce serveur à déja reçu un bump.\n\n` +
             `Vous pourrez de nouveau bump dans **${timeText.trim()}**.\n\n` +
             `• ${interaction.guild.name}`
           )
@@ -115,7 +115,7 @@ client.on("interactionCreate", async interaction => {
         `Vous pourrez de nouveau bump dans **2 heures**.\n\n` +
         `• ${interaction.guild.name}`
       )
-      .setImage("https://raw.githubusercontent.com/pix-craft/pix-craft.github.io/main/Screenshot_20260504_013618_Chrome.jpg");
+      .setImage("https://raw.githubusercontent.com/bp-discord/bp-discord.github.io/refs/heads/main/adminbot/ADMINBOT_20260505_190501_0000(1).png");
 
     return interaction.reply({ embeds: [embed] });
   }
@@ -126,12 +126,12 @@ client.on("interactionCreate", async interaction => {
     const menu = new ActionRowBuilder().addComponents(
       new ChannelSelectMenuBuilder()
         .setCustomId("select_bump_channel")
-        .setPlaceholder("📢 Choisis un salon")
+        .setPlaceholder("🔗 Salon d'invitation")
         .setChannelTypes(ChannelType.GuildText)
     );
 
     return interaction.reply({
-      content: "🔗 Choisis un salon pour créer une invite",
+      content: "🔗 Salon d'invitation",
       components: [menu],
       ephemeral: true
     });
@@ -143,12 +143,12 @@ client.on("interactionCreate", async interaction => {
     const menu = new ActionRowBuilder().addComponents(
       new ChannelSelectMenuBuilder()
         .setCustomId("ia_select_channel")
-        .setPlaceholder("🤖 Salon IA")
+        .setPlaceholder("👾 Salon d'IA")
         .setChannelTypes(ChannelType.GuildText)
     );
 
     return interaction.reply({
-      content: "🤖 Active l’IA dans un salon",
+      content: "Active l'IA dans un salon",
       components: [menu],
       ephemeral: true
     });
